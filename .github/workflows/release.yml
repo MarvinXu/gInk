@@ -34,29 +34,20 @@ jobs:
       run: |
         Copy-Item -Path "bin\config_default.ini" -Destination "bin\config.ini" -Force -ErrorAction SilentlyContinue
 
+    - name: Create zip archive
+      id: zip
+      run: |
+        $zipPath = "bin/gInk-v${{ steps.version.outputs.version }}.zip"
+        Compress-Archive -Path "bin\*" -DestinationPath $zipPath -Force
+        Write-Output "zip_path=$zipPath" >> $env:GITHUB_OUTPUT
+
     - name: Upload Release Asset
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ github.ref_name }}
         name: gInk v${{ steps.version.outputs.version }}
-        body: |
-          ## gInk v${{ steps.version.outputs.version }}
-          
-          Download the attached files to use gInk.
-          
-          ### Changes in this release:
-          - Auto save screenshot when exiting (ESC)
-          - Configurable max screenshot count
-          - Temp folder for auto saved screenshots
+        generate_release_notes: true
         files: |
-          bin/gInk.exe
-          bin/gInk.exe.config
-          bin/config.ini
-          bin/config_default.ini
-          bin/hotkeys.ini
-          bin/pens.ini
-          bin/icon_red.ico
-          bin/icon_white.ico
-          bin/Microsoft.Ink.dll
+          ${{ steps.zip.outputs.zip_path }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
