@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Get tag version
+      id: version
+      run: |
+        $version = $env:GITHUB_REF_NAME -replace '^v', ''
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+
+    - name: Build Release (x86)
+      working-directory: src
+      run: |
+        msbuild gInk.csproj /p:Configuration=Release /p:Platform=x86 /p:OutputPath=..\bin\ /v:minimal
+
+    - name: Copy config file
+      run: |
+        Copy-Item -Path "bin\config_default.ini" -Destination "bin\config.ini" -Force -ErrorAction SilentlyContinue
+
+    - name: Upload Release Asset
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: gInk v${{ steps.version.outputs.version }}
+        body: |
+          ## gInk v${{ steps.version.outputs.version }}
+          
+          Download the attached files to use gInk.
+          
+          ### Changes in this release:
+          - Auto save screenshot when exiting (ESC)
+          - Configurable max screenshot count
+          - Temp folder for auto saved screenshots
+        files: |
+          bin/gInk.exe
+          bin/gInk.exe.config
+          bin/config.ini
+          bin/config_default.ini
+          bin/hotkeys.ini
+          bin/pens.ini
+          bin/icon_red.ico
+          bin/icon_white.ico
+          bin/Microsoft.Ink.dll
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
