@@ -226,9 +226,6 @@ namespace gInk
 		}
 		public void StopInk()
 		{
-			// Auto save screenshot before closing
-			AutoSaveScreenshot();
-
 			FormCollection.Close();
 			FormDisplay.Close();
 			FormButtonHitter.Close();

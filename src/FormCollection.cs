@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -750,6 +750,7 @@ namespace gInk
 		public void RetreatAndExit()
 		{
 			ToThrough();
+			Root.AutoSaveScreenshot();
 			Root.ClearInk();
 			SaveUndoStrokes();
 			Root.SaveOptions("config.ini");
