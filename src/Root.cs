@@ -6,6 +6,7 @@ using System.IO;
 using System.Drawing;
 using System.Net;
 using System.Threading;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Microsoft.Ink;
 
@@ -73,6 +74,11 @@ namespace gInk
 		public string CloseOnSnap = "blankonly";
 		public bool AlwaysHideToolbar = false;
 		public float ToolbarHeight = 0.06f;
+
+		// auto save options
+		public bool AutoSaveOnExit = false;
+		public int AutoSaveMaxCount = 10;
+		public string TempFolderPath = "temp";
 
 		// hotkey options
 		public Hotkey Hotkey_Global = new Hotkey();
@@ -220,6 +226,9 @@ namespace gInk
 		}
 		public void StopInk()
 		{
+			// Auto save screenshot before closing
+			AutoSaveScreenshot();
+
 			FormCollection.Close();
 			FormDisplay.Close();
 			FormButtonHitter.Close();
@@ -661,6 +670,17 @@ namespace gInk
 							else if (sPara == "1")
 								CanvasCursor = 1;
 							break;
+						case "AUTO_SAVE_ON_EXIT":
+							if (sPara.ToUpper() == "TRUE" || sPara == "1" || sPara.ToUpper() == "ON")
+								AutoSaveOnExit = true;
+							break;
+						case "AUTO_SAVE_MAX_COUNT":
+							if (int.TryParse(sPara, out tempi) && tempi > 0)
+								AutoSaveMaxCount = tempi;
+							break;
+						case "TEMP_FOLDER_PATH":
+							TempFolderPath = sPara;
+							break;
 					}
 				}
 			}
@@ -872,6 +892,18 @@ namespace gInk
 						case "CANVAS_CURSOR":
 							sPara = CanvasCursor.ToString();
 							break;
+						case "AUTO_SAVE_ON_EXIT":
+							if (AutoSaveOnExit)
+								sPara = "True";
+							else
+								sPara = "False";
+							break;
+						case "AUTO_SAVE_MAX_COUNT":
+							sPara = AutoSaveMaxCount.ToString();
+							break;
+						case "TEMP_FOLDER_PATH":
+							sPara = TempFolderPath;
+							break;
 					}
 				}
 				if (sPara != "")
@@ -953,6 +985,84 @@ namespace gInk
 
 			trayIcon.Dispose();
 			Application.Exit();
+		}
+
+		// Auto save screenshot to temp folder
+		public void AutoSaveScreenshot()
+		{
+			if (!AutoSaveOnExit)
+				return;
+
+			// Get temp folder path
+			string tempPath = TempFolderPath;
+			if (!Path.IsPathRooted(tempPath))
+			{
+				tempPath = AppDomain.CurrentDomain.BaseDirectory + tempPath;
+			}
+
+			// Create temp folder if not exists
+			if (!Directory.Exists(tempPath))
+			{
+				Directory.CreateDirectory(tempPath);
+			}
+
+			// Get screen bounds
+			int width = SystemInformation.VirtualScreen.Width;
+			int height = SystemInformation.VirtualScreen.Height;
+			int left = SystemInformation.VirtualScreen.Left;
+			int top = SystemInformation.VirtualScreen.Top;
+
+			// Capture screen
+			Bitmap screenshot = new Bitmap(width, height);
+			Graphics g = Graphics.FromImage(screenshot);
+			g.CopyFromScreen(left, top, 0, 0, new Size(width, height));
+
+			// Draw ink strokes on screenshot
+			if (FormCollection != null && FormCollection.IC != null)
+			{
+				FormCollection.IC.Renderer.Draw(g, FormCollection.IC.Ink.Strokes);
+			}
+
+			// Generate filename with timestamp
+			DateTime now = DateTime.Now;
+			string filename = string.Format("autosave_{0}-{1:D2}-{2:D2} {3:D2}-{4:D2}-{5:D2}.png",
+				now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second);
+			string fullPath = Path.Combine(tempPath, filename);
+
+			// Save screenshot
+			screenshot.Save(fullPath, System.Drawing.Imaging.ImageFormat.Png);
+			screenshot.Dispose();
+
+			// Clean up old screenshots
+			CleanupOldScreenshots(tempPath);
+		}
+
+		// Clean up old screenshots exceeding max count
+		private void CleanupOldScreenshots(string tempPath)
+		{
+			if (AutoSaveMaxCount <= 0)
+				return;
+
+			// Get all PNG files in temp folder
+			var files = Directory.GetFiles(tempPath, "autosave_*.png")
+				.Select(f => new FileInfo(f))
+				.OrderBy(f => f.CreationTime)
+				.ToList();
+
+			// Delete oldest files if exceeding max count
+			while (files.Count > AutoSaveMaxCount)
+			{
+				FileInfo oldestFile = files[0];
+				try
+				{
+					File.Delete(oldestFile.FullName);
+				}
+				catch
+				{
+					// Ignore deletion errors
+				}
+				files.RemoveAt(0);
+			}
 		}
 
 		[DllImport("user32.dll")]

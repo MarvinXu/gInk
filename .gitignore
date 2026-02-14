@@ -1,6 +1,7 @@
 build
 release
 bin/crash.txt
+bin/config.ini
 
 *.pdb
 *.exp
