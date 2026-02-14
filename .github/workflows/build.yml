@@ -24,17 +24,11 @@ jobs:
     - name: Build Release (x86)
       working-directory: src
       run: |
-        msbuild gInk.csproj /p:Configuration=Release /p:Platform=x86 /v:minimal
+        msbuild gInk.csproj /p:Configuration=Release /p:Platform=x86 /p:OutputPath=..\bin\ /v:minimal
 
-    - name: Build Release (AnyCPU)
-      working-directory: src
+    - name: Copy config file
       run: |
-        msbuild gInk.csproj /p:Configuration=Release /p:Platform=AnyCPU /v:minimal
-
-    - name: Copy output to bin
-      run: |
-        if (Test-Path "build\obj\Release\gInk.exe") { Copy-Item -Path "build\obj\Release\gInk.exe" -Destination "bin\gInk.exe" -Force }
-        Copy-Item -Path "bin\config_default.ini" -Destination "bin\config.ini" -Force
+        Copy-Item -Path "bin\config_default.ini" -Destination "bin\config.ini" -Force -ErrorAction SilentlyContinue
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
