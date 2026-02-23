@@ -1,9 +1,12 @@
-$ExeName = "gInk.exe"
+$ProcessName = "gInk"
 $MsbuildPath = "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe"
 
-Write-Host "Checking if $ExeName is running..."
-Get-Process $ExeName -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 1
+Write-Host "Checking if $ProcessName is running..."
+$process = Get-Process $ProcessName -ErrorAction SilentlyContinue
+if ($process) {
+    $process | Stop-Process -Force
+    Start-Sleep -Seconds 2
+}
 
 Write-Host "Building gInk..."
 & $MsbuildPath gInk.sln /p:Configuration=Release /p:Platform=x86 /verbosity:minimal
