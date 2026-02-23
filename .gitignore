@@ -2,6 +2,8 @@ build
 release
 bin/crash.txt
 bin/config.ini
+bin/temp
+bin/gInk.exe
 
 *.pdb
 *.exp

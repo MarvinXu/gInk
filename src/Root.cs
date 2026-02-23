@@ -984,53 +984,79 @@ namespace gInk
 			Application.Exit();
 		}
 
-		// Auto save screenshot to temp folder
+		[DllImport("user32.dll")]
+		static extern IntPtr GetDC(IntPtr hWnd);
+		[DllImport("user32.dll")]
+		static extern bool ReleaseDC(IntPtr hWnd, IntPtr hDC);
+		[DllImport("gdi32.dll")]
+		static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+		[DllImport("gdi32.dll")]
+		static extern IntPtr SelectObject(IntPtr hdc, IntPtr hgdiobj);
+		[DllImport("gdi32.dll")]
+		static extern bool DeleteObject(IntPtr hObject);
+		[DllImport("gdi32.dll")]
+		static extern bool DeleteDC(IntPtr hdc);
+		[DllImport("gdi32.dll")]
+		static extern bool BitBlt(IntPtr hdcDest, int nXDest, int nYDest, int nWidth, int nHeight, IntPtr hdcSrc, int nXSrc, int nYSrc, uint dwRop);
+		[DllImport("gdi32.dll")]
+		static extern int GetDeviceCaps(IntPtr hdc, int nIndex);
+
 		public void AutoSaveScreenshot()
 		{
 			if (!AutoSaveOnExit)
 				return;
 
-			// Get temp folder path
+			if (FormDisplay == null)
+				return;
+
+			FormDisplay.ClearCanvus();
+			FormDisplay.DrawStrokes();
+			FormDisplay.UpdateFormDisplay(true);
+
 			string tempPath = TempFolderPath;
 			if (!Path.IsPathRooted(tempPath))
 			{
 				tempPath = AppDomain.CurrentDomain.BaseDirectory + tempPath;
 			}
 
-			// Create temp folder if not exists
 			if (!Directory.Exists(tempPath))
 			{
 				Directory.CreateDirectory(tempPath);
 			}
 
-			// Get screen bounds
-			int width = SystemInformation.VirtualScreen.Width;
-			int height = SystemInformation.VirtualScreen.Height;
-			int left = SystemInformation.VirtualScreen.Left;
-			int top = SystemInformation.VirtualScreen.Top;
+			IntPtr screenDc = GetDC(IntPtr.Zero);
 
-			// Capture screen
+			const int VERTRES = 10;
+			const int DESKTOPVERTRES = 117;
+			int LogicalScreenHeight = GetDeviceCaps(screenDc, VERTRES);
+			int PhysicalScreenHeight = GetDeviceCaps(screenDc, DESKTOPVERTRES);
+			float ScreenScalingFactor = (float)PhysicalScreenHeight / (float)LogicalScreenHeight;
+
+			int width = (int)(SystemInformation.VirtualScreen.Width * ScreenScalingFactor);
+			int height = (int)(SystemInformation.VirtualScreen.Height * ScreenScalingFactor);
+			int left = (int)(SystemInformation.VirtualScreen.Left * ScreenScalingFactor);
+			int top = (int)(SystemInformation.VirtualScreen.Top * ScreenScalingFactor);
+
 			Bitmap screenshot = new Bitmap(width, height);
-			Graphics g = Graphics.FromImage(screenshot);
-			g.CopyFromScreen(left, top, 0, 0, new Size(width, height));
+			IntPtr hBmp = screenshot.GetHbitmap();
+			IntPtr hDest = CreateCompatibleDC(screenDc);
+			SelectObject(hDest, hBmp);
+			BitBlt(hDest, 0, 0, width, height, screenDc, left, top, 0x00CC0020);
 
-			// Draw ink strokes on screenshot
-			if (FormCollection != null && FormCollection.IC != null)
-			{
-				FormCollection.IC.Renderer.Draw(g, FormCollection.IC.Ink.Strokes);
-			}
+			Bitmap finalBitmap = Bitmap.FromHbitmap(hBmp);
+			DeleteObject(hBmp);
+			ReleaseDC(IntPtr.Zero, screenDc);
+			DeleteDC(hDest);
 
-			// Generate filename with timestamp
 			DateTime now = DateTime.Now;
 			string filename = string.Format("autosave_{0}-{1:D2}-{2:D2} {3:D2}-{4:D2}-{5:D2}.png",
 				now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second);
 			string fullPath = Path.Combine(tempPath, filename);
 
-			// Save screenshot
-			screenshot.Save(fullPath, System.Drawing.Imaging.ImageFormat.Png);
+			finalBitmap.Save(fullPath, System.Drawing.Imaging.ImageFormat.Png);
+			finalBitmap.Dispose();
 			screenshot.Dispose();
 
-			// Clean up old screenshots
 			CleanupOldScreenshots(tempPath);
 		}
 
